@@ -49,6 +49,7 @@ from lib import topotest
 
 CWD = os.path.dirname(os.path.realpath(__file__))
 
+
 # pylint: disable=C0103
 # Global Topogen variable. This is being used to keep the Topogen available on
 # all test functions without declaring a test local variable.
@@ -359,6 +360,15 @@ class Topogen(object):
         self.peern += 1
         return self.gears[name]
 
+    def add_bmp_server(self, name, ip, defaultRoute, port=8000):
+        """ """
+        if name in self.gears:
+            raise KeyError("The bmp server already exists")
+
+        self.gears[name] = TopoBMPCollector(
+            self, name, ip=ip, defaultRoute=defaultRoute, port=port
+        )
+
     def add_link(self, node1, node2, ifname1=None, ifname2=None):
         """
         Creates a connection between node1 and node2. The nodes can be the
@@ -420,6 +430,13 @@ class Topogen(object):
         the peer object itself).
         """
         return self.get_gears(TopoExaBGP)
+
+    def get_bmp_servers(self):
+        """
+        Retruns the bmp servers dictionnary (the key is the bmp server the
+        value is the bmp server object itself).
+        """
+        return self.get_gears(TopoBMPCollector)
 
     def start_topology(self):
         """Starts the topology class."""
@@ -1196,6 +1213,28 @@ class TopoExaBGP(TopoHost):
     def stop(self, wait=True, assertOnError=True):
         "Stop ExaBGP peer and kill the daemon"
         self.run("kill `cat /var/run/exabgp/exabgp.pid`")
+        return ""
+
+
+class TopoBMPCollector(TopoHost):
+    PRIVATE_DIRS = [
+        "/var/log",
+    ]
+
+    def __init__(self, tgen, name, **params):
+        params["private_mounts"] = self.PRIVATE_DIRS
+        super(TopoBMPCollector, self).__init__(tgen, name, **params)
+
+    def __str__(self):
+        gear = super(TopoBMPCollector, self).__str__()
+        gear += " TopoBMPCollector<>".format()
+        return gear
+
+    def start(self):
+        self.run("{}/bmp_collector/bmpserver &".format(CWD), stdout=None)
+
+    def stop(self):
+        self.popen("pkill -9 -f bmpserver")
         return ""
 
 
